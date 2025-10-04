@@ -317,7 +317,7 @@
             } else if (teacherId && userRole) {
                 // New system - from localStorage currentUserId and currentUserRole
                 try {
-                    const API_BASE_URL = 'http://localhost:3000';
+                    const API_BASE_URL = 'https://easystudy-66e7.onrender.com';
                     let response;
                     if (userRole === 'teacher') {
                         response = await fetch(`${API_BASE_URL}/api/teachers/${teacherId}`);
@@ -351,7 +351,7 @@
             try {
                 // Fetch room details
                 console.log('Fetching room details for ID:', roomId);
-                const API_BASE_URL = 'http://localhost:3000';
+                const API_BASE_URL = 'https://easystudy-66e7.onrender.com';
                 const response = await fetch(`${API_BASE_URL}/api/study-rooms/${roomId}`);
                 console.log('Room fetch response status:', response.status);
 
@@ -387,7 +387,7 @@
         }
 
         function initializeSocket() {
-            socket = io();
+            socket = io('https://easystudy-66e7.onrender.com');
 
             socket.on('connect', () => {
                 console.log('Connected to server');

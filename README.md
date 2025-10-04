@@ -1,5 +1,10 @@
 # EasyStudy - Smart EdTech Platform
 
+🌐 **[LIVE DEMO](https://easystudy-66e7.onrender.com)** 🌐
+
+**Quick Demo Access:**
+- **Student:** alice@example.com | **Teacher:** davis@example.com
+
 A comprehensive educational technology platform that enables seamless learning experiences for both students and teachers with real-time collaboration features.
 
 ## 🚀 Features
@@ -69,11 +74,14 @@ EasyStudy/
 
 ## 🚀 Getting Started
 
+### Live Demo
+🌐 **Access the live application:** [https://easystudy-66e7.onrender.com](https://easystudy-66e7.onrender.com)
+
 ### Prerequisites
 - Node.js (v14 or higher)
 - npm (Node Package Manager)
 
-### Installation
+### Local Development Setup
 
 1. **Clone the repository**
    ```bash
@@ -87,14 +95,28 @@ EasyStudy/
    npm install
    ```
 
-3. **Start the server**
+3. **Configure environment**
+   - Edit `config.js` and set `environment: 'development'` for local testing
+   - Set `environment: 'production'` for deployment
+
+4. **Start the server**
    ```bash
    node server.js
    ```
 
-4. **Access the application**
-   - Open your browser and navigate to `http://localhost:3000`
+5. **Access the application**
+   - **Live Demo:** Navigate to `https://easystudy-66e7.onrender.com`
+   - **Local Development:** Navigate to `http://localhost:3000`
    - Use the login credentials below to test different user roles
+
+### Deployment
+
+The application is deployed on **Render** with the following configuration:
+- **Backend URL:** `https://easystudy-66e7.onrender.com`
+- **Build Command:** `cd backend && npm install`
+- **Start Command:** `cd backend && node server.js`
+- **Environment:** Node.js
+- **Auto-Deploy:** Enabled from GitHub repository
 
 ## 👥 Demo Accounts
 

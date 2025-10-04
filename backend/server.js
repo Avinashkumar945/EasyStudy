@@ -286,7 +286,7 @@ app.post('/api/videos/upload', upload.single('video'), (req, res) => {
         fs.renameSync(videoFile.path, targetPath);
 
         // Store metadata with video URL (simulate cloud URL)
-        const videoUrl = `http://localhost:3000/cloud_videos/${videoFile.originalname}`;
+        const videoUrl = `https://easystudy-66e7.onrender.com/cloud_videos/${videoFile.originalname}`;
         const videoData = {
             id: Date.now().toString(),
             teacherName,
@@ -334,7 +334,7 @@ app.post('/api/notes/upload', upload.single('notes'), (req, res) => {
         fs.renameSync(notesFile.path, targetPath);
 
         // Store metadata with notes URL (simulate cloud URL)
-        const notesUrl = `http://localhost:3000/cloud_notes/${notesFile.originalname}`;
+        const notesUrl = `https://easystudy-66e7.onrender.com/cloud_notes/${notesFile.originalname}`;
         const notesData = {
             id: Date.now().toString(),
             teacherName,
