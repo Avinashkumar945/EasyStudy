@@ -67,6 +67,9 @@ let uploadedNotes = [];
 // In-memory store for live lectures
 let activeLectures = [];
 
+// In-memory store for study rooms
+let studyRooms = [];
+
 // ==========================================================
 // API Endpoints
 // ==========================================================
@@ -398,28 +401,211 @@ app.delete('/api/live/end', (req, res) => {
     }
 });
 
-// --- Socket.io for WebRTC Signaling ---
+
+
+// --- STUDY ROOM Endpoints ---
+app.get('/api/study-rooms', (req, res) => {
+    const activeRooms = studyRooms.filter(room => room.isActive);
+    res.json(activeRooms);
+});
+
+app.get('/api/study-rooms/:id', (req, res) => {
+    const roomId = req.params.id;
+    const room = studyRooms.find(r => r.id === roomId && r.isActive);
+    
+    if (!room) {
+        return res.status(404).json({ message: 'Study room not found or inactive' });
+    }
+    
+    res.json(room);
+});
+
+app.post('/api/study-rooms/create', (req, res) => {
+    const { creatorId, creatorName, creatorRole, roomName, subject, description } = req.body;
+    
+    if (!creatorId || !creatorName || !creatorRole || !roomName) {
+        return res.status(400).json({ message: 'Missing required fields' });
+    }
+
+    const newRoom = {
+        id: Date.now().toString(),
+        roomName,
+        subject: subject || 'General',
+        description: description || '',
+        creatorId: parseInt(creatorId),
+        creatorName,
+        creatorRole,
+        participants: [{
+            id: parseInt(creatorId),
+            name: creatorName,
+            role: creatorRole,
+            joinedAt: new Date().toISOString()
+        }],
+        createdAt: new Date().toISOString(),
+        isActive: true
+    };
+
+    studyRooms.push(newRoom);
+    console.log(`✅ Study room created: ${roomName} by ${creatorName} (${creatorRole})`);
+    
+    // Emit to all connected clients about new room
+    io.emit('room-created', newRoom);
+    
+    res.status(201).json({ message: 'Study room created successfully', room: newRoom });
+});
+
+app.post('/api/study-rooms/:id/join', (req, res) => {
+    const roomId = req.params.id;
+    const { userId, userName, userRole } = req.body;
+    
+    if (!userId || !userName || !userRole) {
+        return res.status(400).json({ message: 'Missing user information' });
+    }
+
+    const room = studyRooms.find(r => r.id === roomId && r.isActive);
+    if (!room) {
+        return res.status(404).json({ message: 'Study room not found or inactive' });
+    }
+
+    // Check if user is already in the room
+    const existingParticipant = room.participants.find(p => p.id === parseInt(userId));
+    if (existingParticipant) {
+        return res.status(200).json({ message: 'Already in room', room });
+    }
+
+    // Add user to room
+    room.participants.push({
+        id: parseInt(userId),
+        name: userName,
+        role: userRole,
+        joinedAt: new Date().toISOString()
+    });
+
+    console.log(`✅ ${userName} (${userRole}) joined room: ${room.roomName}`);
+    
+    // Emit to room participants about new member
+    io.to(`room-${roomId}`).emit('user-joined', {
+        id: parseInt(userId),
+        name: userName,
+        role: userRole
+    });
+    
+    res.status(200).json({ message: 'Joined room successfully', room });
+});
+
+app.post('/api/study-rooms/:id/leave', (req, res) => {
+    const roomId = req.params.id;
+    const { userId } = req.body;
+    
+    const room = studyRooms.find(r => r.id === roomId);
+    if (!room) {
+        return res.status(404).json({ message: 'Study room not found' });
+    }
+
+    // Remove user from room
+    const userIndex = room.participants.findIndex(p => p.id === parseInt(userId));
+    if (userIndex === -1) {
+        return res.status(404).json({ message: 'User not in room' });
+    }
+
+    const leavingUser = room.participants[userIndex];
+    room.participants.splice(userIndex, 1);
+
+    // If room is empty or creator left, deactivate room
+    if (room.participants.length === 0 || room.creatorId === parseInt(userId)) {
+        room.isActive = false;
+        console.log(`✅ Study room deactivated: ${room.roomName}`);
+        io.emit('room-closed', { roomId });
+    } else {
+        io.to(`room-${roomId}`).emit('user-left', { userId: parseInt(userId), userName: leavingUser.name });
+    }
+
+    console.log(`✅ ${leavingUser.name} left room: ${room.roomName}`);
+    res.status(200).json({ message: 'Left room successfully' });
+});
+
+// --- Socket.io for WebRTC Signaling and Study Rooms ---
 io.on('connection', (socket) => {
     console.log('User connected:', socket.id);
 
+    // Live lecture events
     socket.on('join-live', (data) => {
         socket.join('live-room');
         console.log(`User ${socket.id} joined live room`);
     });
 
+    // Study room events
+    socket.on('join-study-room', (data) => {
+        const { roomId, userId, userName } = data;
+        socket.join(`room-${roomId}`);
+        socket.userId = userId;
+        socket.currentRoom = roomId;
+        console.log(`User ${userName} (${socket.id}) joined study room ${roomId}`);
+        
+        // Notify others in the room
+        socket.to(`room-${roomId}`).emit('user-connected', { userId, userName, socketId: socket.id });
+    });
+
+    socket.on('leave-study-room', (data) => {
+        const { roomId } = data;
+        socket.leave(`room-${roomId}`);
+        socket.to(`room-${roomId}`).emit('user-disconnected', { socketId: socket.id });
+        console.log(`User ${socket.id} left study room ${roomId}`);
+    });
+
+    // WebRTC signaling for both live lectures and study rooms
     socket.on('offer', (data) => {
-        socket.to('live-room').emit('offer', data);
+        if (data.roomId) {
+            socket.to(`room-${data.roomId}`).emit('offer', data);
+        } else {
+            socket.to('live-room').emit('offer', data);
+        }
     });
 
     socket.on('answer', (data) => {
-        socket.to('live-room').emit('answer', data);
+        if (data.roomId) {
+            socket.to(`room-${data.roomId}`).emit('answer', data);
+        } else {
+            socket.to('live-room').emit('answer', data);
+        }
     });
 
     socket.on('ice-candidate', (data) => {
-        socket.to('live-room').emit('ice-candidate', data);
+        if (data.roomId) {
+            socket.to(`room-${data.roomId}`).emit('ice-candidate', data);
+        } else {
+            socket.to('live-room').emit('ice-candidate', data);
+        }
+    });
+
+    // Study room chat
+    socket.on('chat-message', (data) => {
+        const { roomId, message, userName, userRole } = data;
+        const chatMessage = {
+            id: Date.now(),
+            message,
+            userName,
+            userRole,
+            timestamp: new Date().toISOString()
+        };
+        io.to(`room-${roomId}`).emit('chat-message', chatMessage);
+    });
+
+    // Screen sharing
+    socket.on('start-screen-share', (data) => {
+        const { roomId } = data;
+        socket.to(`room-${roomId}`).emit('screen-share-started', { userId: socket.userId });
+    });
+
+    socket.on('stop-screen-share', (data) => {
+        const { roomId } = data;
+        socket.to(`room-${roomId}`).emit('screen-share-stopped', { userId: socket.userId });
     });
 
     socket.on('disconnect', () => {
+        if (socket.currentRoom) {
+            socket.to(`room-${socket.currentRoom}`).emit('user-disconnected', { socketId: socket.id });
+        }
         console.log('User disconnected:', socket.id);
     });
 });
